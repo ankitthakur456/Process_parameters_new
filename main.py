@@ -11,6 +11,7 @@ from database import DBHelper
 from logging.handlers import TimedRotatingFileHandler
 import os
 import struct
+from datetime import datetime
 log_level = logging.INFO
 from dotenv import load_dotenv
 load_dotenv()
@@ -53,12 +54,11 @@ SAMPLE_RATE = 1
 #ENV FILE VARIABLES
 HOST=os.getenv('HOST')
 ACCESS_TOKEN=os.getenv('ACCESS_TOKEN')
-USERNAME = os.getenv('user')
-print(USERNAME)
+USERNAME = os.getenv('USER')
 PASSWORD = os.getenv('PASSWORD')
 HOST_SENSOR=os.getenv("HOST_SENSOR")
 HOST_SENSOR1=os.getenv("HOST_SENSOR1")
-ACCESS_TOKEN_SENSOR = os.getenv('ACCESS_TOKEN_SENSOR')
+ACCESS_TOKEN_SENSOR = ob_db.get_access_data()
 #END REGION
 
 payload = {}
@@ -73,32 +73,6 @@ HEADERS = {
         }
 
 
-def get_plant_data():
-    try:
-        payload = {}
-        req = requests.request("GET", HOST_SENSOR, headers=HEADERS, data=payload)
-       # log.info(req.text)
-        log.info(req.reason)
-        if req.status_code in [401, 403]:
-            pass
-            refresh_jwt_token()
-        raw_data = req.json()
-        payload = {}
-        #log.info(f'raw data is {raw_data}')
-        id_list = []
-        if raw_data is not None:
-            max_id = max([m_data['id'] for m_data in raw_data])
-            latest_data = {}
-            for m_data in raw_data:
-                if m_data['id'] == max_id:
-                    latest_data = m_data
-                    log.info(f'lstest data is {latest_data}')
-        return payload
-    except Exception as e:
-        log.error(f"Error while reading plant data {e}")
-    return []
-
-
 def convert_hex_to_ieee754(hex_str):
     try:
         # currently converting to big endian
@@ -109,46 +83,79 @@ def convert_hex_to_ieee754(hex_str):
 
     return round(decimal_value_big_endian, 5)
 
+
 def get_equipment_area_asset():
     try:
         payload = {}
-        req = requests.request("POST", HOST_SENSOR1, headers=HEADERS, data=payload)
-        log.info(req.status_code)
-        #log.info(req.text)
-        if req.status_code in [401, 403]:
-          pass
-          refresh_jwt_token()
-        raw_data = req.json()
-        payload = {}
-        #log.info(f'raw data is {raw_data}')
+        all_payload = []
+        # Get the current date in the format YYYY-MM-DD
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        date = "2024-04-01"
+        print(date)
+        plant_id = [3047, 3048, 3049, 3058, 3059, 3060, 3061, 3062, 3063]
+        for pid in plant_id:
+            url = f"{HOST_SENSOR1}equipmentId={pid}&start={date}T12%3A13%3A14Z&end={current_date}T12%3A13%3A14Z&page=1&pageSize=10"
+            req1 = requests.request("POST", url, headers=HEADERS, data=payload)
+            #print(req1.json())  # Print the response
+            if req1.status_code in [401, 403]:
+                pass
+                refresh_jwt_token()
+            raw_data = req1.json()
 
-        id_list = []
-        if raw_data is not None:
-            latest_data = raw_data['data']['externalTableResponse']
+            id_list = []
+            if raw_data is not None:
+                payload = {}
+                if pid ==3047:
+                    latest_data_a = raw_data['data']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:01'][0]['process_parameter_001_a']
+                    payload['Steam Temperature']= convert_hex_to_ieee754(latest_data_a)
+                    latest_data_b= raw_data['data']['externalTableResponse'][1]['externalTableData']['00:30:11:78:A1:A6:02'][0]['process_parameter_001_b']
+                    payload['Paper GSM']= convert_hex_to_ieee754(latest_data_b)
+                    latest_data_c = raw_data['data']['externalTableResponse'][2]['externalTableData']['00:30:11:78:A1:A6:03'][0]['process_parameter_001_c']
+                    payload['Machine Speed']= convert_hex_to_ieee754(latest_data_c)
+                    latest_data_d = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:04'][0]['process_parameter_001_d']
+                    payload['Steam Presure GP1']= convert_hex_to_ieee754(latest_data_d)
+                    post_sensors_data(payload)
+                elif pid == 3048:
+                    latest_data_e = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:05'][0]['process_parameter_001_e']
+                    payload['Steam Presure GP2'] = convert_hex_to_ieee754(latest_data_e)
+                    post_sensors_data(payload)
+                elif pid == 3049:
+                    latest_data_f =  raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:06'][0]['process_parameter_001_f']
+                    payload['Steam Presure GP3'] = convert_hex_to_ieee754(latest_data_f)
+                    post_sensors_data(payload)
+                elif pid ==3058:
+                    latest_data_g = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:07'][0]['process_parameter_001_g']
+                    payload["Steam Presure GP4"]=convert_hex_to_ieee754(latest_data_g)
+                    post_sensors_data(payload)
+                elif pid == 3059:
+                    latest_data_h = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:08'][0]['process_parameter_001_h']
+                    payload['Steam Presure GP5']= convert_hex_to_ieee754(latest_data_h)
+                    post_sensors_data(payload)
+                elif pid == 3060:
+                    latest_data_i = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:09'][0]['process_parameter_001_i']
+                    payload['Steam Presure GP6']= convert_hex_to_ieee754(latest_data_i)
+                    post_sensors_data(payload)
+                elif pid == 3061:
+                    latest_data_j = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:10'][0]['process_parameter_001_j']
+                    payload['Steam Presure GP7'] =  convert_hex_to_ieee754(latest_data_j)
+                    post_sensors_data(payload)
+                elif pid == 3062:
+                    latest_data_k = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:11'][0]['process_parameter_001_k']
+                    payload['Steam Presure GP8']= convert_hex_to_ieee754(latest_data_k)
+                    post_sensors_data(payload)
+                elif pid == 3063:
+                    latest_data_k = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:12'][0]['process_parameter_001_l']
+                    payload['Steam Presure GP9']= convert_hex_to_ieee754(latest_data_k)
+                    post_sensors_data(payload)
 
-            latest_data1 = raw_data['data']['area']['machineGropus']['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:11'][0]['process_parameter_001_k']                             #['externalTableResponse'][0]['externalTableData']['00:30:11:78:A1:A6:11']['process_parameter_001_k']  #['machineGropus']['externalTableResponse'][0]
-
-            if latest_data:
-                steam_temp = latest_data[0]['externalTableData']['00:30:11:78:A1:A6:01'][0]['process_parameter_001_a']
-                #log.info(f'raw data is {steam_temp}')
-                # if steam_temp is not None:
-                #     max_id = max(steam_temp, key=lambda x: x['id'])
-                    # print(max_id)
-                    # steam = max_id['process_parameter_001_a']
-                    # print(f'steam data is {steam}')
-                paper_gsm = latest_data[1]['externalTableData']['00:30:11:78:A1:A6:02'][0]['process_parameter_001_b']
-                machine_speed = latest_data[2]['externalTableData']['00:30:11:78:A1:A6:03'][0]['process_parameter_001_c']
-                payload = {
-                'Steam Temperature': convert_hex_to_ieee754(steam_temp),
-                'Paper GSM': convert_hex_to_ieee754(paper_gsm),
-                'Machine Speed': convert_hex_to_ieee754(machine_speed),
-                'Steam Presure GP 8': convert_hex_to_ieee754(latest_data1)
-                }
-                log.info(payload)
-                return(payload)
+                time.sleep(5)
+        #         all_payload.append(payload)
+        #
+        # log.info(payload)
+        # return(all_payload)
     except Exception as e:
         log.error(f"Error while getting the API data {e}")
-    return []
+        return []
 
 
 def post_sensors_data(payload):
@@ -197,13 +204,10 @@ if __name__ == "__main__":
                 log.info("[+] Error No Access Token is Found Refreshing...")
                 refresh_jwt_token()
             data = get_equipment_area_asset()
-            log.info(data)
-            # data2 = get_plant_data()
-            # log.info(f'plant data is {data2}')
             at = ob_db.get_access_data()
             ACCESS_TOKEN_SENSOR = at
             HEADERS['Authorization'] = f'Bearer {ACCESS_TOKEN_SENSOR}'
-            post_sensors_data(data)
+            #post_sensors_data(data)
             #schedule.run_pending()
             time.sleep(5)
     except Exception as e:
